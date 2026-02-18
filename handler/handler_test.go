@@ -552,6 +552,129 @@ func TestTWL_CopiesRootFilesWithoutIngredientEntries(t *testing.T) {
 	}
 }
 
+func TestTA_DoesNotCopyManifestOrMediaToRoot(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := &rc.Manifest{
+		DublinCore: rc.DublinCore{
+			Subject:    "Translation Academy",
+			Identifier: "ta",
+			Title:      "Test TA",
+			Issued:     "2024-01-01",
+			Publisher:  "test",
+			Rights:     "CC BY-SA 4.0",
+			Language: rc.Language{
+				Identifier: "en",
+				Title:      "English",
+				Direction:  "ltr",
+			},
+		},
+		Projects: []rc.Project{
+			{Identifier: "intro"},
+		},
+	}
+
+	if err := os.MkdirAll(filepath.Join(inDir, "intro"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "intro", "01.md"), []byte("# Intro"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "manifest.yaml"), []byte("dublin_core: {}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "media.yaml"), []byte("projects: []"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := handler.Lookup("Translation Academy")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(outDir, "LICENSE.md")); os.IsNotExist(err) {
+		t.Error("LICENSE.md should be copied to TA output root")
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "manifest.yaml")); !os.IsNotExist(err) {
+		t.Error("manifest.yaml should not be copied to TA output root")
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "media.yaml")); !os.IsNotExist(err) {
+		t.Error("media.yaml should not be copied to TA output root")
+	}
+	if _, ok := metadata.Ingredients["ingredients/LICENSE.md"]; !ok {
+		t.Error("ingredients/LICENSE.md should exist in TA metadata ingredients")
+	}
+}
+
+func TestOBS_DoesNotCopyManifestOrMediaToRoot(t *testing.T) {
+	inDir := t.TempDir()
+	outDir := t.TempDir()
+
+	manifest := &rc.Manifest{
+		DublinCore: rc.DublinCore{
+			Subject:    "Open Bible Stories",
+			Identifier: "obs",
+			Title:      "Test OBS",
+			Issued:     "2024-01-01",
+			Publisher:  "test",
+			Rights:     "CC BY-SA 4.0",
+			Language: rc.Language{
+				Identifier: "en",
+				Title:      "English",
+				Direction:  "ltr",
+			},
+		},
+	}
+
+	if err := os.MkdirAll(filepath.Join(inDir, "content"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "content", "01.md"), []byte("# Story"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "LICENSE.md"), []byte("License"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "manifest.yaml"), []byte("dublin_core: {}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(inDir, "media.yaml"), []byte("projects: []"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	h, err := handler.Lookup("Open Bible Stories")
+	if err != nil {
+		t.Fatalf("Lookup failed: %v", err)
+	}
+
+	metadata, err := h.Convert(context.Background(), manifest, inDir, outDir, handler.Options{})
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(outDir, "LICENSE.md")); os.IsNotExist(err) {
+		t.Error("LICENSE.md should be copied to OBS output root")
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "manifest.yaml")); !os.IsNotExist(err) {
+		t.Error("manifest.yaml should not be copied to OBS output root")
+	}
+	if _, err := os.Stat(filepath.Join(outDir, "media.yaml")); !os.IsNotExist(err) {
+		t.Error("media.yaml should not be copied to OBS output root")
+	}
+	if _, ok := metadata.Ingredients["ingredients/LICENSE.md"]; !ok {
+		t.Error("ingredients/LICENSE.md should exist in OBS metadata ingredients")
+	}
+}
+
 // --- Registry tests ---
 
 func TestLookup_AllRegisteredSubjects(t *testing.T) {

@@ -46,15 +46,11 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		return nil, err
 	}
 
-	// Copy additional TA-specific root-level files: LICENSE.md, manifest.yaml, media.yaml
-	taRootFiles := []string{"LICENSE.md", "manifest.yaml", "media.yaml"}
-	for _, name := range taRootFiles {
-		src := filepath.Join(inDir, name)
-		if _, err := os.Stat(src); os.IsNotExist(err) {
-			continue
-		}
-		if err := CopyFile(src, filepath.Join(outDir, name)); err != nil {
-			return nil, fmt.Errorf("copying root file %s: %w", name, err)
+	// Copy LICENSE.md to root.
+	licSrc := filepath.Join(inDir, "LICENSE.md")
+	if _, err := os.Stat(licSrc); err == nil {
+		if err := CopyFile(licSrc, filepath.Join(outDir, "LICENSE.md")); err != nil {
+			return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
 		}
 	}
 
@@ -77,7 +73,6 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	}
 
 	// Copy LICENSE.md to ingredients/LICENSE.md
-	licSrc := filepath.Join(inDir, "LICENSE.md")
 	if _, err := os.Stat(licSrc); err == nil {
 		ing, err := CopyFileAndComputeIngredient(licSrc, outDir, "ingredients/LICENSE.md")
 		if err != nil {
