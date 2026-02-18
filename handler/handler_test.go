@@ -34,20 +34,20 @@ func TestCopyCommonRootFiles_CopiesREADMEAndGitignore(t *testing.T) {
 		t.Fatalf("CopyCommonRootFiles failed: %v", err)
 	}
 
-	// Verify README.md was copied and is in ingredients
+	// Verify README.md was copied and is not in ingredients
 	if _, err := os.Stat(filepath.Join(outDir, "README.md")); os.IsNotExist(err) {
 		t.Error("README.md was not copied to outDir")
 	}
-	if _, ok := m.Ingredients["README.md"]; !ok {
-		t.Error("README.md missing from metadata ingredients")
+	if _, ok := m.Ingredients["README.md"]; ok {
+		t.Error("README.md should not be in metadata ingredients")
 	}
 
-	// Verify .gitignore was copied and is in ingredients
+	// Verify .gitignore was copied and is not in ingredients
 	if _, err := os.Stat(filepath.Join(outDir, ".gitignore")); os.IsNotExist(err) {
 		t.Error(".gitignore was not copied to outDir")
 	}
-	if _, ok := m.Ingredients[".gitignore"]; !ok {
-		t.Error(".gitignore missing from metadata ingredients")
+	if _, ok := m.Ingredients[".gitignore"]; ok {
+		t.Error(".gitignore should not be in metadata ingredients")
 	}
 }
 
@@ -73,8 +73,8 @@ func TestCopyCommonRootFiles_CopiesGiteaDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, ".gitea", "auto_merge.yaml")); os.IsNotExist(err) {
 		t.Error(".gitea/auto_merge.yaml was not copied to outDir")
 	}
-	if _, ok := m.Ingredients[".gitea/auto_merge.yaml"]; !ok {
-		t.Error(".gitea/auto_merge.yaml missing from metadata ingredients")
+	if _, ok := m.Ingredients[".gitea/auto_merge.yaml"]; ok {
+		t.Error(".gitea/auto_merge.yaml should not be in metadata ingredients")
 	}
 }
 
@@ -100,8 +100,8 @@ func TestCopyCommonRootFiles_CopiesGithubDir(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outDir, ".github", "workflows", "ci.yml")); os.IsNotExist(err) {
 		t.Error(".github/workflows/ci.yml was not copied to outDir")
 	}
-	if _, ok := m.Ingredients[".github/workflows/ci.yml"]; !ok {
-		t.Error(".github/workflows/ci.yml missing from metadata ingredients")
+	if _, ok := m.Ingredients[".github/workflows/ci.yml"]; ok {
+		t.Error(".github/workflows/ci.yml should not be in metadata ingredients")
 	}
 }
 
@@ -149,7 +149,7 @@ func TestCopyCommonRootFiles_DoesNotCopyGitDir(t *testing.T) {
 	}
 }
 
-func TestCopyCommonRootFiles_IngredientsHaveValidChecksums(t *testing.T) {
+func TestCopyCommonRootFiles_DoesNotAddRootFilesToIngredients(t *testing.T) {
 	inDir := t.TempDir()
 	outDir := t.TempDir()
 
@@ -163,18 +163,8 @@ func TestCopyCommonRootFiles_IngredientsHaveValidChecksums(t *testing.T) {
 		t.Fatalf("CopyCommonRootFiles failed: %v", err)
 	}
 
-	ing, ok := m.Ingredients["README.md"]
-	if !ok {
-		t.Fatal("README.md missing from ingredients")
-	}
-	if ing.Size != int64(len(content)) {
-		t.Errorf("Size = %d; want %d", ing.Size, len(content))
-	}
-	if ing.Checksum.MD5 == "" {
-		t.Error("MD5 checksum should not be empty")
-	}
-	if ing.MimeType != "text/markdown" {
-		t.Errorf("MimeType = %q; want %q", ing.MimeType, "text/markdown")
+	if len(m.Ingredients) != 0 {
+		t.Errorf("Expected no root-file ingredient entries, got %d", len(m.Ingredients))
 	}
 }
 
@@ -522,7 +512,7 @@ func TestTWL_StripsTWLPrefix(t *testing.T) {
 	}
 }
 
-func TestTWL_CopiesRootFiles(t *testing.T) {
+func TestTWL_CopiesRootFilesWithoutIngredientEntries(t *testing.T) {
 	inDir := t.TempDir()
 	outDir := t.TempDir()
 
@@ -545,12 +535,12 @@ func TestTWL_CopiesRootFiles(t *testing.T) {
 		t.Fatalf("Convert failed: %v", err)
 	}
 
-	// Verify root files were copied
-	if _, ok := metadata.Ingredients["README.md"]; !ok {
-		t.Error("README.md missing from TWL metadata ingredients")
+	// Verify root files are not in ingredients metadata
+	if _, ok := metadata.Ingredients["README.md"]; ok {
+		t.Error("README.md should not be present in TWL metadata ingredients")
 	}
-	if _, ok := metadata.Ingredients[".gitignore"]; !ok {
-		t.Error(".gitignore missing from TWL metadata ingredients")
+	if _, ok := metadata.Ingredients[".gitignore"]; ok {
+		t.Error(".gitignore should not be present in TWL metadata ingredients")
 	}
 
 	// Verify files exist on disk

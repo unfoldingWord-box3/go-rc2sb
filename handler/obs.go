@@ -54,11 +54,9 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue
 		}
-		ing, err := CopyFileAndComputeIngredient(src, outDir, name)
-		if err != nil {
+		if err := CopyFile(src, filepath.Join(outDir, name)); err != nil {
 			return nil, fmt.Errorf("copying root file %s: %w", name, err)
 		}
-		m.Ingredients[name] = ing
 	}
 
 	// Copy content/ directory to ingredients/content/

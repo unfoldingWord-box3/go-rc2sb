@@ -158,8 +158,8 @@ func CopyRootFile(inDir, outDir, filename string) (sb.Ingredient, error) {
 
 // CopyCommonRootFiles copies common root-level files from the RC repo to the SB output
 // if they exist: README.md, .gitea, .github, .gitignore (but NOT .git).
-// Files are copied to the SB root and added to the metadata ingredients map.
-func CopyCommonRootFiles(inDir, outDir string, m *sb.Metadata) error {
+// Files are copied to the SB root but are intentionally NOT added to metadata ingredients.
+func CopyCommonRootFiles(inDir, outDir string, _ *sb.Metadata) error {
 	// Individual files to copy
 	files := []string{"README.md", ".gitignore"}
 	for _, name := range files {
@@ -167,11 +167,9 @@ func CopyCommonRootFiles(inDir, outDir string, m *sb.Metadata) error {
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue
 		}
-		ing, err := CopyFileAndComputeIngredient(src, outDir, name)
-		if err != nil {
+		if err := CopyFile(src, filepath.Join(outDir, name)); err != nil {
 			return fmt.Errorf("copying root file %s: %w", name, err)
 		}
-		m.Ingredients[name] = ing
 	}
 
 	// Directories to copy recursively
@@ -182,10 +180,33 @@ func CopyCommonRootFiles(inDir, outDir string, m *sb.Metadata) error {
 		if os.IsNotExist(err) || !info.IsDir() {
 			continue
 		}
-		if err := copyTreeToIngredients(src, outDir, dirName, m); err != nil {
+		if err := copyTree(src, outDir, dirName); err != nil {
 			return fmt.Errorf("copying root directory %s: %w", dirName, err)
 		}
 	}
 
 	return nil
+}
+
+// copyTree recursively copies srcDir into outDir/destPrefix without adding metadata entries.
+func copyTree(srcDir, outDir, destPrefix string) error {
+	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+
+		dstPath := filepath.Join(outDir, destPrefix, relPath)
+		if err := CopyFile(path, dstPath); err != nil {
+			return fmt.Errorf("copying %s: %w", relPath, err)
+		}
+		return nil
+	})
 }

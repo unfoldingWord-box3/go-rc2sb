@@ -53,11 +53,9 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue
 		}
-		ing, err := CopyFileAndComputeIngredient(src, outDir, name)
-		if err != nil {
+		if err := CopyFile(src, filepath.Join(outDir, name)); err != nil {
 			return nil, fmt.Errorf("copying root file %s: %w", name, err)
 		}
-		m.Ingredients[name] = ing
 	}
 
 	// Copy each project directory to ingredients/

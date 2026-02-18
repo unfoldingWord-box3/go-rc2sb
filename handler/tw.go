@@ -49,11 +49,9 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	// Copy LICENSE.md to root
 	licSrc := filepath.Join(inDir, "LICENSE.md")
 	if _, statErr := os.Stat(licSrc); statErr == nil {
-		ing, err := CopyFileAndComputeIngredient(licSrc, outDir, "LICENSE.md")
-		if err != nil {
+		if err := CopyFile(licSrc, filepath.Join(outDir, "LICENSE.md")); err != nil {
 			return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
 		}
-		m.Ingredients["LICENSE.md"] = ing
 	}
 
 	// Copy bible/ contents to ingredients/

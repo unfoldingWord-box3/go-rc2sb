@@ -486,31 +486,44 @@ func compareStructuralMetadata(t *testing.T, expected, generated *sb.Metadata) {
 	}
 
 	// Compare ingredient keys (not values, since source files may have changed).
+	// Only compare keys under ingredients/; root files are intentionally excluded
+	// from metadata ingredients.
 	// Source RC files may evolve independently of the sample SB metadata,
 	// so differences in content-based ingredients are logged but not fatal.
+	expectedIngredientKeys := make(map[string]bool)
+	for key := range expected.Ingredients {
+		if strings.HasPrefix(key, "ingredients/") {
+			expectedIngredientKeys[key] = true
+		}
+	}
+	generatedIngredientKeys := make(map[string]bool)
+	for key := range generated.Ingredients {
+		if strings.HasPrefix(key, "ingredients/") {
+			generatedIngredientKeys[key] = true
+		}
+	}
+
 	missing := 0
 	extra := 0
-	for key := range expected.Ingredients {
-		if _, ok := generated.Ingredients[key]; !ok {
+	for key := range expectedIngredientKeys {
+		if !generatedIngredientKeys[key] {
 			missing++
 			t.Logf("  ingredient in expected but not generated: %s", key)
 		}
 	}
-	for key := range generated.Ingredients {
-		if _, ok := expected.Ingredients[key]; !ok {
+	for key := range generatedIngredientKeys {
+		if !expectedIngredientKeys[key] {
 			extra++
 			t.Logf("  ingredient in generated but not expected: %s", key)
 		}
 	}
 	// Only fail if there are too many missing ingredients (>10% of expected).
-	// Extra ingredients are expected and OK (e.g., new root files like README.md,
-	// .gitignore, .gitea/, .github/ that weren't in the original sample SB).
-	expectedCount := len(expected.Ingredients)
+	expectedCount := len(expectedIngredientKeys)
 	if expectedCount > 0 && missing > 0 {
 		missingRate := float64(missing) / float64(expectedCount)
 		if missingRate > 0.10 {
 			t.Errorf("Too many missing ingredients (>10%%): generated=%d, expected=%d (missing=%d, extra=%d)",
-				len(generated.Ingredients), expectedCount, missing, extra)
+				len(generatedIngredientKeys), expectedCount, missing, extra)
 		}
 	}
 
@@ -540,7 +553,7 @@ func compareStructuralMetadata(t *testing.T, expected, generated *sb.Metadata) {
 
 // verifyRootFileCopying checks that root files (README.md, .gitignore, .gitea/, .github/)
 // are copied from the RC repo to the SB output when they exist in the source.
-func verifyRootFileCopying(t *testing.T, inDir, outDir string, generated *sb.Metadata) {
+func verifyRootFileCopying(t *testing.T, inDir, outDir string, _ *sb.Metadata) {
 	t.Helper()
 
 	// Check individual root files
@@ -556,12 +569,6 @@ func verifyRootFileCopying(t *testing.T, inDir, outDir string, generated *sb.Met
 
 		if srcExists && !dstExists {
 			t.Errorf("Root file %s exists in RC but was not copied to SB output", name)
-		}
-		if srcExists && dstExists {
-			// Verify it's in the metadata ingredients
-			if _, ok := generated.Ingredients[name]; !ok {
-				t.Errorf("Root file %s was copied but missing from metadata ingredients", name)
-			}
 		}
 		if !srcExists && dstExists {
 			t.Errorf("Root file %s does not exist in RC but appeared in SB output", name)
@@ -581,19 +588,6 @@ func verifyRootFileCopying(t *testing.T, inDir, outDir string, generated *sb.Met
 
 		if srcExists && !dstExists {
 			t.Errorf("Root directory %s exists in RC but was not copied to SB output", dirName)
-		}
-		if srcExists && dstExists {
-			// Verify at least one file from the directory is in ingredients
-			found := false
-			for key := range generated.Ingredients {
-				if strings.HasPrefix(key, dirName+"/") {
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Errorf("Root directory %s was copied but no files from it are in metadata ingredients", dirName)
-			}
 		}
 	}
 }
