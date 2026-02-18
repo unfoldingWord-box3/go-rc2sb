@@ -41,9 +41,14 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	m.Copyright = BuildCopyright(manifest, false)
 	m.LocalizedNames = map[string]sb.LocalizedName{}
 
-	// Copy root-level files: .gitignore, LICENSE.md, README.md, manifest.yaml, media.yaml
-	rootFiles := []string{".gitignore", "LICENSE.md", "README.md", "manifest.yaml", "media.yaml"}
-	for _, name := range rootFiles {
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
+	}
+
+	// Copy additional TA-specific root-level files: LICENSE.md, manifest.yaml, media.yaml
+	taRootFiles := []string{"LICENSE.md", "manifest.yaml", "media.yaml"}
+	for _, name := range taRootFiles {
 		src := filepath.Join(inDir, name)
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue

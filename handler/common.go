@@ -155,3 +155,37 @@ func CopyRootFile(inDir, outDir, filename string) (sb.Ingredient, error) {
 	}
 	return CopyFileAndComputeIngredient(src, outDir, filename)
 }
+
+// CopyCommonRootFiles copies common root-level files from the RC repo to the SB output
+// if they exist: README.md, .gitea, .github, .gitignore (but NOT .git).
+// Files are copied to the SB root and added to the metadata ingredients map.
+func CopyCommonRootFiles(inDir, outDir string, m *sb.Metadata) error {
+	// Individual files to copy
+	files := []string{"README.md", ".gitignore"}
+	for _, name := range files {
+		src := filepath.Join(inDir, name)
+		if _, err := os.Stat(src); os.IsNotExist(err) {
+			continue
+		}
+		ing, err := CopyFileAndComputeIngredient(src, outDir, name)
+		if err != nil {
+			return fmt.Errorf("copying root file %s: %w", name, err)
+		}
+		m.Ingredients[name] = ing
+	}
+
+	// Directories to copy recursively
+	dirs := []string{".gitea", ".github"}
+	for _, dirName := range dirs {
+		src := filepath.Join(inDir, dirName)
+		info, err := os.Stat(src)
+		if os.IsNotExist(err) || !info.IsDir() {
+			continue
+		}
+		if err := copyTreeToIngredients(src, outDir, dirName, m); err != nil {
+			return fmt.Errorf("copying root directory %s: %w", dirName, err)
+		}
+	}
+
+	return nil
+}

@@ -34,18 +34,38 @@ func main() {
 }
 ```
 
-### With Payload (TWL)
+### TWL Payload
 
-For subjects that require a payload directory (e.g., TSV Translation Words Links needs the Translation Words repo):
+For TSV Translation Words Links repos, a payload directory can be created from a Translation Words source. When a payload is available, the handler will:
+1. Copy `bible/*` from the TW directory to `ingredients/payload/` in the SB output
+2. Rewrite `rc://*/tw/dict/bible/...` links in the TSV files to `./payload/...` paths
+
+There are two ways to provide the TW source:
+
+**Option 1: Explicit path via `PayloadPath`** — Use this when the TW directory is stored separately from the TWL repo:
 
 ```go
 opts := rc2sb.Options{
-    PayloadDirs: map[string]string{
-        "Translation Words": "/path/to/en_tw",
-    },
+    PayloadPath: "/path/to/en_tw",  // path to the <lang>_tw directory
 }
-
 result, err := rc2sb.Convert(ctx, "/path/to/en_twl", "/path/to/output", opts)
+```
+
+**Option 2: Auto-detection** — If the RC repo contains a `<lang>_tw/` subdirectory (where `<lang>` matches the manifest's language identifier, e.g., `en_tw/`), it is detected automatically:
+
+```go
+// The en_twl RC repo contains en_tw/ as a subdirectory — auto-detected
+result, err := rc2sb.Convert(ctx, "/path/to/en_twl", "/path/to/output", rc2sb.Options{})
+```
+
+If neither `PayloadPath` is set nor a `<lang>_tw/` subdirectory exists, the TSV files are copied as-is without payload or link rewriting.
+
+### CLI Tool
+
+A simple CLI wrapper is available at `cmd/rc2sb/`:
+
+```bash
+go run ./cmd/rc2sb /path/to/rc-repo /path/to/sb-output
 ```
 
 ## API
@@ -57,7 +77,7 @@ Converts an RC repository to SB format.
 - `ctx` - Context for cancellation
 - `inDir` - Path to the RC repository (must contain `manifest.yaml`)
 - `outDir` - Path where SB output will be written
-- `opts` - Options including optional payload directories
+- `opts` - Conversion options (see Options below)
 
 Returns a `Result` with conversion metadata, or an error.
 
@@ -65,7 +85,10 @@ Returns a `Result` with conversion metadata, or an error.
 
 ```go
 type Options struct {
-    PayloadDirs map[string]string // Maps subject names to payload RC repo paths
+    // PayloadPath is the path to a Translation Words directory (e.g., "/path/to/en_tw").
+    // Used for TWL conversion to create the ingredients/payload/ directory and
+    // rewrite rc:// links in TSV files. If empty, auto-detects <lang>_tw/ inside inDir.
+    PayloadPath string
 }
 ```
 
@@ -94,7 +117,7 @@ type Result struct {
 | Translation Academy | peripheral/x-peripheralArticles | Copies nested markdown hierarchy |
 | TSV Translation Notes | parascriptural/x-bcvnotes | Strips tn_ prefix from TSV filenames |
 | TSV Translation Questions | parascriptural/x-bcvquestions | Strips tq_ prefix from TSV filenames |
-| TSV Translation Words Links | parascriptural/x-bcvarticles | Includes TW payload when provided |
+| TSV Translation Words Links | parascriptural/x-bcvarticles | Auto-detects `<lang>_tw/` for payload; rewrites rc:// links |
 | TSV OBS Study Notes | peripheral/x-obsnotes | Single TSV file conversion |
 | TSV OBS Study Questions | peripheral/x-obsquestions | Single TSV file conversion |
 | TSV OBS Translation Notes | peripheral/x-obsnotes | Single TSV file conversion |
@@ -154,6 +177,8 @@ Integration tests use sample RC/SB pairs in the `samples/` directory (gitignored
 go-rc2sb/
 +-- convert.go              # Public Convert() function
 +-- options.go              # Options and Result types
++-- cmd/rc2sb/
+|   +-- main.go             # CLI wrapper
 +-- rc/
 |   +-- manifest.go         # RC manifest.yaml parsing
 +-- sb/

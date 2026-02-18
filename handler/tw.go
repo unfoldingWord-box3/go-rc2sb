@@ -41,18 +41,19 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	m.Copyright = BuildCopyright(manifest, false)
 	m.LocalizedNames = map[string]sb.LocalizedName{}
 
-	// Copy root-level files: .gitignore, LICENSE.md, README.md
-	rootFiles := []string{".gitignore", "LICENSE.md", "README.md"}
-	for _, name := range rootFiles {
-		src := filepath.Join(inDir, name)
-		if _, err := os.Stat(src); os.IsNotExist(err) {
-			continue
-		}
-		ing, err := CopyFileAndComputeIngredient(src, outDir, name)
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
+	}
+
+	// Copy LICENSE.md to root
+	licSrc := filepath.Join(inDir, "LICENSE.md")
+	if _, statErr := os.Stat(licSrc); statErr == nil {
+		ing, err := CopyFileAndComputeIngredient(licSrc, outDir, "LICENSE.md")
 		if err != nil {
-			return nil, fmt.Errorf("copying root file %s: %w", name, err)
+			return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
 		}
-		m.Ingredients[name] = ing
+		m.Ingredients["LICENSE.md"] = ing
 	}
 
 	// Copy bible/ contents to ingredients/
@@ -63,8 +64,7 @@ func (h *twHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	}
 
 	// Copy LICENSE.md to ingredients/LICENSE.md
-	licSrc := filepath.Join(inDir, "LICENSE.md")
-	if _, err := os.Stat(licSrc); err == nil {
+	if _, statErr := os.Stat(licSrc); statErr == nil {
 		ing, err := CopyFileAndComputeIngredient(licSrc, outDir, "ingredients/LICENSE.md")
 		if err != nil {
 			return nil, fmt.Errorf("copying ingredients/LICENSE.md: %w", err)

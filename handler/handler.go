@@ -10,9 +10,9 @@ import (
 
 // Options holds conversion options passed to handlers.
 type Options struct {
-	// PayloadDirs maps subject names to paths of additional RC repos
-	// that provide payload data (e.g., "Translation Words" for TWL).
-	PayloadDirs map[string]string
+	// PayloadPath is the path to a Translation Words directory for TWL conversion.
+	// See rc2sb.Options.PayloadPath for details.
+	PayloadPath string
 }
 
 // Handler is the interface that each subject-specific converter implements.

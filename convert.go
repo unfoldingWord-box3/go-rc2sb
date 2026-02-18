@@ -39,12 +39,10 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 		return Result{}, fmt.Errorf("creating output directory: %w", err)
 	}
 
-	// Convert handler options
-	handlerOpts := handler.Options{
-		PayloadDirs: opts.PayloadDirs,
-	}
-
 	// Run the handler
+	handlerOpts := handler.Options{
+		PayloadPath: opts.PayloadPath,
+	}
 	metadata, err := h.Convert(ctx, manifest, inDir, outDir, handlerOpts)
 	if err != nil {
 		return Result{}, fmt.Errorf("converting %s: %w", subject, err)

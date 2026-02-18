@@ -76,6 +76,11 @@ func (h *obsTSVHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDi
 	}
 	m.Ingredients[ingredientKey] = ing
 
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
+	}
+
 	// Copy LICENSE.md
 	licIng, err := CopyLicenseIngredient(inDir, outDir)
 	if err != nil {

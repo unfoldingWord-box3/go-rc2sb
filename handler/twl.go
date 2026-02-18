@@ -15,7 +15,11 @@ import (
 )
 
 // twLinkRegexp parses RC links like "rc://*/tw/dict/bible/other/creation"
-var twLinkRegexp = regexp.MustCompile(`rc://[^/]*/tw/dict/bible/([^/]+)/([^/]+)`)
+var twLinkRegexp = regexp.MustCompile(`rc://[^/]*/tw/dict/bible/([^/]+)/([^/\t]+)`)
+
+// twLinkReplaceRegexp matches a TWLink column value at end of a TSV line for replacement.
+// Matches: \trc://<anything>/tw/dict/bible/<category>/<article> at end of line
+var twLinkReplaceRegexp = regexp.MustCompile(`\trc://[^/]+/tw/dict/bible/([^\t]+)$`)
 
 // NewTWLHandler creates a new TSV Translation Words Links handler.
 func NewTWLHandler() Handler {
@@ -48,8 +52,24 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 
 	m.Copyright = BuildCopyright(manifest, false)
 
-	// Collect all TWLink references for payload processing
-	twLinks := make(map[string]bool) // "category/article" -> true
+	// Determine payload source: explicit PayloadPath option, or auto-detect <lang>_tw/ in inDir
+	var twBibleDir string
+	if opts.PayloadPath != "" {
+		twBibleDir = filepath.Join(opts.PayloadPath, "bible")
+	} else {
+		lang := manifest.DublinCore.Language.Identifier
+		twBibleDir = filepath.Join(inDir, lang+"_tw", "bible")
+	}
+
+	_, twDirErr := os.Stat(twBibleDir)
+	hasPayload := twDirErr == nil
+
+	// If payload exists, copy the TW bible/ tree to ingredients/payload/
+	if hasPayload {
+		if err := copyTreeToIngredients(twBibleDir, outDir, "ingredients/payload", m); err != nil {
+			return nil, fmt.Errorf("copying TW payload: %w", err)
+		}
+	}
 
 	// Process each project (TSV file per book)
 	for _, project := range manifest.Projects {
@@ -77,32 +97,29 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 			m.LocalizedNames[key] = localizedName
 		}
 
-		// Copy TSV file with scope
-		ing, err := CopyFileWithScope(srcPath, outDir, ingredientKey, scope)
-		if err != nil {
-			return nil, fmt.Errorf("copying %s: %w", srcFilename, err)
-		}
-		m.Ingredients[ingredientKey] = ing
-
-		// Extract TWLink references from the TSV file
-		links, err := extractTWLinks(srcPath)
-		if err != nil {
-			return nil, fmt.Errorf("extracting TWLinks from %s: %w", srcFilename, err)
-		}
-		for _, link := range links {
-			twLinks[link] = true
+		if hasPayload {
+			// Copy TSV file with rc:// link rewriting, then compute ingredient
+			ing, err := copyTSVWithLinkRewrite(srcPath, outDir, ingredientKey, scope)
+			if err != nil {
+				return nil, fmt.Errorf("copying %s with link rewrite: %w", srcFilename, err)
+			}
+			m.Ingredients[ingredientKey] = ing
+		} else {
+			// Copy TSV file as-is (no payload, no link rewriting)
+			ing, err := CopyFileWithScope(srcPath, outDir, ingredientKey, scope)
+			if err != nil {
+				return nil, fmt.Errorf("copying %s: %w", srcFilename, err)
+			}
+			m.Ingredients[ingredientKey] = ing
 		}
 	}
 
 	// Set the currentScope
 	m.Type.FlavorType.CurrentScope = currentScope
 
-	// Process payload if Translation Words directory is available
-	twDir, hasTW := opts.PayloadDirs["Translation Words"]
-	if hasTW && twDir != "" {
-		if err := processTWPayload(ctx, twDir, outDir, twLinks, m); err != nil {
-			return nil, fmt.Errorf("processing TW payload: %w", err)
-		}
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
 	}
 
 	// Copy LICENSE.md to ingredients/
@@ -115,86 +132,79 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 	return m, nil
 }
 
-// extractTWLinks reads a TSV file and extracts all unique TWLink RC references.
-// Returns a slice of "category/article" strings (e.g., "other/creation").
-func extractTWLinks(tsvPath string) ([]string, error) {
-	f, err := os.Open(tsvPath)
+// copyTSVWithLinkRewrite copies a TSV file while replacing rc:// TWLink references
+// with relative payload paths (e.g., rc://*/tw/dict/bible/names/peter -> ./payload/names/peter.md).
+// The ingredient checksum/size is computed after the rewrite.
+func copyTSVWithLinkRewrite(srcPath, outDir, ingredientKey string, scope map[string][]string) (sb.Ingredient, error) {
+	// Read the source file
+	inFile, err := os.Open(srcPath)
 	if err != nil {
-		return nil, err
+		return sb.Ingredient{}, fmt.Errorf("opening %s: %w", srcPath, err)
 	}
-	defer f.Close()
+	defer inFile.Close()
 
-	scanner := bufio.NewScanner(f)
+	// Create the destination file
+	dstPath := filepath.Join(outDir, ingredientKey)
+	if err := os.MkdirAll(filepath.Dir(dstPath), 0755); err != nil {
+		return sb.Ingredient{}, fmt.Errorf("creating directory for %s: %w", dstPath, err)
+	}
+
+	outFile, err := os.Create(dstPath)
+	if err != nil {
+		return sb.Ingredient{}, fmt.Errorf("creating %s: %w", dstPath, err)
+	}
+	defer outFile.Close()
+
+	scanner := bufio.NewScanner(inFile)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024) // 1MB buffer for large lines
+	writer := bufio.NewWriter(outFile)
 
-	// Read header to find TWLink column index
-	if !scanner.Scan() {
-		return nil, fmt.Errorf("empty TSV file: %s", tsvPath)
-	}
-	header := scanner.Text()
-	cols := strings.Split(header, "\t")
-
-	twLinkCol := -1
-	for i, col := range cols {
-		if strings.TrimSpace(col) == "TWLink" {
-			twLinkCol = i
-			break
-		}
-	}
-	if twLinkCol < 0 {
-		return nil, nil // No TWLink column, nothing to extract
-	}
-
-	seen := make(map[string]bool)
-	var links []string
-
+	first := true
 	for scanner.Scan() {
 		line := scanner.Text()
-		fields := strings.Split(line, "\t")
-		if twLinkCol >= len(fields) {
-			continue
-		}
 
-		twLink := fields[twLinkCol]
-		matches := twLinkRegexp.FindAllStringSubmatch(twLink, -1)
-		for _, match := range matches {
-			if len(match) >= 3 {
-				key := match[1] + "/" + match[2] // "category/article"
-				if !seen[key] {
-					seen[key] = true
-					links = append(links, key)
-				}
+		if !first {
+			if _, err := writer.WriteString("\n"); err != nil {
+				return sb.Ingredient{}, err
+			}
+		}
+		first = false
+
+		// Replace rc:// links in TWLink column with ./payload/ paths
+		rewritten := twLinkReplaceRegexp.ReplaceAllString(line, "\t./payload/$1.md")
+
+		if _, err := writer.WriteString(rewritten); err != nil {
+			return sb.Ingredient{}, err
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return sb.Ingredient{}, fmt.Errorf("reading %s: %w", srcPath, err)
+	}
+
+	// Write trailing newline if original file had one
+	srcInfo, err := os.Stat(srcPath)
+	if err == nil && srcInfo.Size() > 0 {
+		// Check if original file ends with newline
+		f, err := os.Open(srcPath)
+		if err == nil {
+			buf := make([]byte, 1)
+			f.Seek(srcInfo.Size()-1, 0)
+			f.Read(buf)
+			f.Close()
+			if buf[0] == '\n' {
+				writer.WriteString("\n")
 			}
 		}
 	}
 
-	return links, scanner.Err()
-}
-
-// processTWPayload copies referenced Translation Words articles to the payload directory.
-func processTWPayload(ctx context.Context, twDir, outDir string, twLinks map[string]bool, m *sb.Metadata) error {
-	// The TW RC has articles in bible/{category}/{article}.md
-	bibleDir := filepath.Join(twDir, "bible")
-
-	for link := range twLinks {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		// link is "category/article" (e.g., "other/creation")
-		srcFile := filepath.Join(bibleDir, link+".md")
-		if _, err := os.Stat(srcFile); os.IsNotExist(err) {
-			// Article not found, skip
-			continue
-		}
-
-		ingredientKey := "ingredients/payload/" + link + ".md"
-		ing, err := CopyFileAndComputeIngredient(srcFile, outDir, ingredientKey)
-		if err != nil {
-			return fmt.Errorf("copying TW article %s: %w", link, err)
-		}
-		m.Ingredients[ingredientKey] = ing
+	if err := writer.Flush(); err != nil {
+		return sb.Ingredient{}, err
+	}
+	if err := outFile.Close(); err != nil {
+		return sb.Ingredient{}, err
 	}
 
-	return nil
+	// Compute ingredient from the rewritten file
+	return sb.ComputeIngredientWithScope(dstPath, scope)
 }

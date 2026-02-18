@@ -79,6 +79,11 @@ func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 	// Set the currentScope
 	m.Type.FlavorType.CurrentScope = currentScope
 
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
+	}
+
 	// Copy LICENSE.md to ingredients/
 	licIng, err := CopyLicenseIngredient(inDir, outDir)
 	if err != nil {

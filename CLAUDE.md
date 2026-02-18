@@ -33,7 +33,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 ```
 
 - Reads `manifest.yaml` from `inDir`, determines the subject, looks up the handler, runs conversion, writes `metadata.json` to `outDir`.
-- `Options.PayloadDirs` maps subject names to auxiliary RC repo paths (e.g., TWL needs Translation Words).
+- `Options.PayloadPath` specifies an explicit path to a `<lang>_tw` directory for TWL payload creation. If empty, auto-detects `<lang>_tw/` inside `inDir`.
 
 ### Package Structure
 
@@ -41,6 +41,8 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 go-rc2sb/
 ├── convert.go              # Public Convert() function, orchestration
 ├── options.go              # Options and Result types
+├── cmd/rc2sb/
+│   └── main.go             # CLI wrapper
 ├── rc/
 │   └── manifest.go         # RC manifest.yaml parsing (DublinCore, projects)
 ├── sb/
@@ -68,7 +70,8 @@ go-rc2sb/
 
 - **Handler pattern**: Each subject type implements the `Handler` interface (`Subject() string`, `Convert(...)`). Handlers are registered in `handler/subjects/register.go` via `init()`.
 - **Blank import for registration**: `convert.go` imports `_ "github.com/nichmahn/go-rc2sb/handler/subjects"` to trigger handler registration.
-- **Shared helpers in `handler/common.go`**: `BuildBaseMetadata()`, `BuildCopyright()`, `CopyFileAndComputeIngredient()`, `CopyFileWithScope()`, `CopyLicenseIngredient()`, `copyTreeToIngredients()`.
+- **Shared helpers in `handler/common.go`**: `BuildBaseMetadata()`, `BuildCopyright()`, `CopyFileAndComputeIngredient()`, `CopyFileWithScope()`, `CopyLicenseIngredient()`, `CopyCommonRootFiles()`.
+- **Root file copying**: All handlers call `CopyCommonRootFiles()` which copies README.md, .gitignore, .gitea/, .github/ (but NOT .git/) from the RC repo if they exist.
 
 ### Subject -> SB Type Mapping
 
@@ -103,8 +106,9 @@ go-rc2sb/
 1. **Metadata**: Transform `manifest.yaml` (Dublin Core) into `metadata.json` (Scripture Burrito schema) — map identifiers, versions, languages, project info
 2. **File relocation**: Copy content files into `ingredients/` directory, adjusting paths per resource type (e.g., strip `tn_` prefix from TSV filenames, strip numeric prefix from USFM filenames)
 3. **Checksum computation**: SB metadata.json requires MD5 checksums, MIME types, and byte sizes for every ingredient file
-4. **Content preservation**: File contents (Markdown, USFM, TSV) are unchanged between formats
-5. **Payload resolution**: TWL extracts `rc://*/tw/dict/bible/{category}/{article}` links from the TWLink TSV column and copies matched TW articles to `ingredients/payload/`
+4. **Content preservation**: File contents (Markdown, USFM, TSV) are unchanged between formats (except TWL TSV link rewriting)
+5. **Root file copying**: README.md, .gitignore, .gitea/, .github/ are copied from RC to SB root if present (not .git/)
+6. **TWL payload resolution**: If `Options.PayloadPath` is set or a `<lang>_tw/` subdirectory exists in the RC repo (where `<lang>` = `dublin_core.language.identifier`), copies the TW `bible/*` to `ingredients/payload/` and rewrites `rc://*/tw/dict/bible/{path}` links in TSV files to `./payload/{path}.md`
 
 ### Testing
 

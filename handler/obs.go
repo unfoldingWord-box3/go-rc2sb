@@ -42,9 +42,14 @@ func (h *obsHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 	// OBS uses a different copyright format
 	m.Copyright = BuildCopyright(manifest, true)
 
-	// Copy root-level files: LICENSE.md, README.md, manifest.yaml, media.yaml
-	rootFiles := []string{"LICENSE.md", "README.md", "manifest.yaml", "media.yaml"}
-	for _, name := range rootFiles {
+	// Copy common root files (README.md, .gitignore, .gitea, .github)
+	if err := CopyCommonRootFiles(inDir, outDir, m); err != nil {
+		return nil, err
+	}
+
+	// Copy additional OBS-specific root-level files: LICENSE.md, manifest.yaml, media.yaml
+	obsRootFiles := []string{"LICENSE.md", "manifest.yaml", "media.yaml"}
+	for _, name := range obsRootFiles {
 		src := filepath.Join(inDir, name)
 		if _, err := os.Stat(src); os.IsNotExist(err) {
 			continue

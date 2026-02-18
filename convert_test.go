@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	rc2sb "github.com/nichmahn/go-rc2sb"
@@ -76,6 +77,7 @@ func TestConvertOBSTSVStudyNotes(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertOBSTSVStudyQuestions tests conversion of TSV OBS Study Questions.
@@ -102,6 +104,7 @@ func TestConvertOBSTSVStudyQuestions(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertOBSTSVTranslationNotes tests conversion of TSV OBS Translation Notes.
@@ -128,6 +131,7 @@ func TestConvertOBSTSVTranslationNotes(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertOBSTSVTranslationQuestions tests conversion of TSV OBS Translation Questions.
@@ -154,6 +158,7 @@ func TestConvertOBSTSVTranslationQuestions(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertOpenBibleStories tests conversion of Open Bible Stories.
@@ -180,6 +185,7 @@ func TestConvertOpenBibleStories(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertAlignedBible tests conversion of Aligned Bible.
@@ -206,6 +212,7 @@ func TestConvertAlignedBible(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertTranslationWords tests conversion of Translation Words.
@@ -232,6 +239,7 @@ func TestConvertTranslationWords(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertTranslationAcademy tests conversion of Translation Academy.
@@ -258,13 +266,14 @@ func TestConvertTranslationAcademy(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertTSVTranslationNotes tests conversion of TSV Translation Notes.
 func TestConvertTSVTranslationNotes(t *testing.T) {
 	samples := samplesDir(t)
 	sampleDir := filepath.Join(samples, "TSV Translation Notes")
-	inDir := filepath.Join(sampleDir, "rc", "en_tn")
+	inDir := filepath.Join(sampleDir, "rc")
 	sbDir := filepath.Join(sampleDir, "sb")
 
 	outDir := t.TempDir()
@@ -284,6 +293,7 @@ func TestConvertTSVTranslationNotes(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertTSVTranslationQuestions tests conversion of TSV Translation Questions.
@@ -310,28 +320,20 @@ func TestConvertTSVTranslationQuestions(t *testing.T) {
 
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
+	verifyRootFileCopying(t, inDir, outDir, generated)
 }
 
 // TestConvertTSVTranslationWordsLinks tests conversion of TSV Translation Words Links with payload.
 func TestConvertTSVTranslationWordsLinks(t *testing.T) {
 	samples := samplesDir(t)
 	sampleDir := filepath.Join(samples, "TSV Translation Words Links")
-	inDir := filepath.Join(sampleDir, "rc", "en_twl")
+	inDir := filepath.Join(sampleDir, "rc")
 	sbDir := filepath.Join(sampleDir, "sb")
-
-	// TWL needs the TW payload directory
-	twDir := filepath.Join(sampleDir, "rc", "en_tw")
 
 	outDir := t.TempDir()
 	ctx := context.Background()
 
-	opts := rc2sb.Options{
-		PayloadDirs: map[string]string{
-			"Translation Words": twDir,
-		},
-	}
-
-	result, err := rc2sb.Convert(ctx, inDir, outDir, opts)
+	result, err := rc2sb.Convert(ctx, inDir, outDir, rc2sb.Options{})
 	if err != nil {
 		t.Fatalf("Convert failed: %v", err)
 	}
@@ -346,16 +348,102 @@ func TestConvertTSVTranslationWordsLinks(t *testing.T) {
 	compareStructuralMetadata(t, expected, generated)
 	verifyInternalConsistency(t, generated, outDir)
 
-	// Verify payload was included
+	// Verify payload was included (en_tw/ exists in the RC repo)
 	payloadCount := 0
 	for key := range generated.Ingredients {
-		if len(key) > 20 && key[:20] == "ingredients/payload/" {
+		if strings.HasPrefix(key, "ingredients/payload/") {
 			payloadCount++
 		}
 	}
 	if payloadCount == 0 {
 		t.Error("Expected payload ingredients but found none")
 	}
+
+	// Verify TSV files had rc:// links rewritten to ./payload/ paths
+	for key := range generated.Ingredients {
+		if !strings.HasSuffix(key, ".tsv") {
+			continue
+		}
+		tsvPath := filepath.Join(outDir, key)
+		data, err := os.ReadFile(tsvPath)
+		if err != nil {
+			t.Errorf("reading %s: %v", key, err)
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "rc://") {
+			t.Errorf("TSV file %s still contains rc:// links after rewrite", key)
+		}
+		if !strings.Contains(content, "./payload/") {
+			t.Errorf("TSV file %s does not contain ./payload/ paths after rewrite", key)
+		}
+		break // Only need to check one file
+	}
+
+	verifyRootFileCopying(t, inDir, outDir, generated)
+}
+
+// TestConvertTWLWithPayloadPath tests TWL conversion using an explicit PayloadPath option
+// instead of relying on auto-detection of <lang>_tw/ inside inDir.
+func TestConvertTWLWithPayloadPath(t *testing.T) {
+	samples := samplesDir(t)
+	sampleDir := filepath.Join(samples, "TSV Translation Words Links")
+	inDir := filepath.Join(sampleDir, "rc")
+
+	// The en_tw directory is inside the RC repo; we'll pass it explicitly via PayloadPath
+	payloadPath := filepath.Join(inDir, "en_tw")
+	if _, err := os.Stat(payloadPath); os.IsNotExist(err) {
+		t.Skip("en_tw directory not found in TWL sample; skipping PayloadPath test")
+	}
+
+	outDir := t.TempDir()
+	ctx := context.Background()
+
+	opts := rc2sb.Options{PayloadPath: payloadPath}
+	result, err := rc2sb.Convert(ctx, inDir, outDir, opts)
+	if err != nil {
+		t.Fatalf("Convert with PayloadPath failed: %v", err)
+	}
+
+	if result.Subject != "TSV Translation Words Links" {
+		t.Errorf("Subject = %q; want %q", result.Subject, "TSV Translation Words Links")
+	}
+
+	generated := loadGeneratedMetadata(t, outDir)
+
+	// Verify payload was included via the explicit PayloadPath
+	payloadCount := 0
+	for key := range generated.Ingredients {
+		if strings.HasPrefix(key, "ingredients/payload/") {
+			payloadCount++
+		}
+	}
+	if payloadCount == 0 {
+		t.Error("Expected payload ingredients with explicit PayloadPath but found none")
+	}
+
+	// Verify TSV files had rc:// links rewritten
+	for key := range generated.Ingredients {
+		if !strings.HasSuffix(key, ".tsv") {
+			continue
+		}
+		tsvPath := filepath.Join(outDir, key)
+		data, err := os.ReadFile(tsvPath)
+		if err != nil {
+			t.Errorf("reading %s: %v", key, err)
+			continue
+		}
+		content := string(data)
+		if strings.Contains(content, "rc://") {
+			t.Errorf("TSV file %s still contains rc:// links after rewrite with PayloadPath", key)
+		}
+		if !strings.Contains(content, "./payload/") {
+			t.Errorf("TSV file %s does not contain ./payload/ paths after rewrite with PayloadPath", key)
+		}
+		break
+	}
+
+	verifyInternalConsistency(t, generated, outDir)
 }
 
 // compareStructuralMetadata compares the structural elements of expected and generated metadata.
@@ -414,14 +502,15 @@ func compareStructuralMetadata(t *testing.T, expected, generated *sb.Metadata) {
 			t.Logf("  ingredient in generated but not expected: %s", key)
 		}
 	}
-	// Only fail if the counts are very different (>10% deviation)
+	// Only fail if there are too many missing ingredients (>10% of expected).
+	// Extra ingredients are expected and OK (e.g., new root files like README.md,
+	// .gitignore, .gitea/, .github/ that weren't in the original sample SB).
 	expectedCount := len(expected.Ingredients)
-	generatedCount := len(generated.Ingredients)
-	if expectedCount > 0 {
-		deviation := float64(abs(generatedCount-expectedCount)) / float64(expectedCount)
-		if deviation > 0.10 {
-			t.Errorf("Ingredient count differs by >10%%: generated=%d, expected=%d (missing=%d, extra=%d)",
-				generatedCount, expectedCount, missing, extra)
+	if expectedCount > 0 && missing > 0 {
+		missingRate := float64(missing) / float64(expectedCount)
+		if missingRate > 0.10 {
+			t.Errorf("Too many missing ingredients (>10%%): generated=%d, expected=%d (missing=%d, extra=%d)",
+				len(generated.Ingredients), expectedCount, missing, extra)
 		}
 	}
 
@@ -445,6 +534,66 @@ func compareStructuralMetadata(t *testing.T, expected, generated *sb.Metadata) {
 	for key := range expected.LocalizedNames {
 		if _, ok := generated.LocalizedNames[key]; !ok {
 			t.Errorf("localizedNames missing key %q", key)
+		}
+	}
+}
+
+// verifyRootFileCopying checks that root files (README.md, .gitignore, .gitea/, .github/)
+// are copied from the RC repo to the SB output when they exist in the source.
+func verifyRootFileCopying(t *testing.T, inDir, outDir string, generated *sb.Metadata) {
+	t.Helper()
+
+	// Check individual root files
+	rootFiles := []string{"README.md", ".gitignore"}
+	for _, name := range rootFiles {
+		srcPath := filepath.Join(inDir, name)
+		_, srcErr := os.Stat(srcPath)
+		srcExists := srcErr == nil
+
+		dstPath := filepath.Join(outDir, name)
+		_, dstErr := os.Stat(dstPath)
+		dstExists := dstErr == nil
+
+		if srcExists && !dstExists {
+			t.Errorf("Root file %s exists in RC but was not copied to SB output", name)
+		}
+		if srcExists && dstExists {
+			// Verify it's in the metadata ingredients
+			if _, ok := generated.Ingredients[name]; !ok {
+				t.Errorf("Root file %s was copied but missing from metadata ingredients", name)
+			}
+		}
+		if !srcExists && dstExists {
+			t.Errorf("Root file %s does not exist in RC but appeared in SB output", name)
+		}
+	}
+
+	// Check root directories
+	rootDirs := []string{".gitea", ".github"}
+	for _, dirName := range rootDirs {
+		srcPath := filepath.Join(inDir, dirName)
+		srcInfo, srcErr := os.Stat(srcPath)
+		srcExists := srcErr == nil && srcInfo.IsDir()
+
+		dstPath := filepath.Join(outDir, dirName)
+		dstInfo, dstErr := os.Stat(dstPath)
+		dstExists := dstErr == nil && dstInfo.IsDir()
+
+		if srcExists && !dstExists {
+			t.Errorf("Root directory %s exists in RC but was not copied to SB output", dirName)
+		}
+		if srcExists && dstExists {
+			// Verify at least one file from the directory is in ingredients
+			found := false
+			for key := range generated.Ingredients {
+				if strings.HasPrefix(key, dirName+"/") {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("Root directory %s was copied but no files from it are in metadata ingredients", dirName)
+			}
 		}
 	}
 }
