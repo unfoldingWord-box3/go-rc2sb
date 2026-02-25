@@ -79,6 +79,9 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 		}
 
 		srcPath := filepath.Join(inDir, strings.TrimPrefix(project.Path, "./"))
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			continue
+		}
 		srcFilename := filepath.Base(srcPath)
 
 		// Strip "twl_" prefix: "twl_GEN.tsv" -> "GEN.tsv"

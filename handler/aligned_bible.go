@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -62,6 +63,9 @@ func (h *bibleHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir
 
 		// Get the source file path
 		srcPath := filepath.Join(inDir, strings.TrimPrefix(project.Path, "./"))
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			continue
+		}
 		srcFilename := filepath.Base(srcPath)
 
 		// Convert filename: "01-GEN.usfm" -> "GEN.usfm"

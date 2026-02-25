@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -51,6 +52,9 @@ func (h *tnHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		}
 
 		srcPath := filepath.Join(inDir, strings.TrimPrefix(project.Path, "./"))
+		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+			continue
+		}
 		srcFilename := filepath.Base(srcPath)
 
 		// Strip "tn_" prefix: "tn_GEN.tsv" -> "GEN.tsv"
