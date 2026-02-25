@@ -13,6 +13,10 @@ type Options struct {
 	// PayloadPath is the path to a Translation Words directory for TWL conversion.
 	// See rc2sb.Options.PayloadPath for details.
 	PayloadPath string
+
+	// USFMPath is the path to a directory containing USFM files for localized book names.
+	// See rc2sb.Options.USFMPath for details.
+	USFMPath string
 }
 
 // Handler is the interface that each subject-specific converter implements.

@@ -12,6 +12,17 @@ type Options struct {
 	// the input RC repo directory (where <lang> is the manifest's language identifier).
 	// If neither is found, no payload is created and TSV files are copied as-is.
 	PayloadPath string
+
+	// USFMPath is the path to a directory containing USFM files for localized
+	// Bible book names. This is used by TSV handlers (TN, TQ, TWL) to extract
+	// \toc1, \toc2, \toc3 markers for book names in the target language.
+	//
+	// For Bible/USFM handlers, the USFM files in the input RC repo are used
+	// directly, so this option is not needed.
+	//
+	// If empty, TSV handlers will use project titles from the manifest,
+	// falling back to English names from the books package.
+	USFMPath string
 }
 
 // Result holds information about a completed conversion.

@@ -4,11 +4,14 @@
 //
 //	rc2sb [flags] <inDir> <outDir>
 //	rc2sb --payload /path/to/en_tw <inDir> <outDir>
+//	rc2sb --usfm /path/to/en_ult <inDir> <outDir>
 //
 // Flags:
 //
 //	--payload <dir>   Path to a Translation Words directory (e.g., en_tw) for TWL payload creation.
 //	                  If not set, auto-detects <lang>_tw/ inside inDir.
+//	--usfm <dir>      Path to a USFM directory for localized Bible book names in TSV repos.
+//	                  If not set, uses manifest project titles, then English fallback.
 package main
 
 import (
@@ -23,6 +26,7 @@ import (
 
 func main() {
 	payload := flag.String("payload", "", "path to a Translation Words directory (e.g., en_tw) for TWL payload creation")
+	usfm := flag.String("usfm", "", "path to a USFM directory for localized Bible book names in TSV repos")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: rc2sb [flags] <inDir> <outDir>\n\n")
 		fmt.Fprintf(os.Stderr, "Converts a Resource Container (RC) repository to Scripture Burrito (SB) format.\n\n")
@@ -44,6 +48,7 @@ func main() {
 
 	opts := rc2sb.Options{
 		PayloadPath: *payload,
+		USFMPath:    *usfm,
 	}
 
 	result, err := rc2sb.Convert(context.Background(), inDir, outDir, opts)

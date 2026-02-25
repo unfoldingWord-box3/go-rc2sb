@@ -46,12 +46,9 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		return nil, err
 	}
 
-	// Copy LICENSE.md to root.
-	licSrc := filepath.Join(inDir, "LICENSE.md")
-	if _, err := os.Stat(licSrc); err == nil {
-		if err := CopyFile(licSrc, filepath.Join(outDir, "LICENSE.md")); err != nil {
-			return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
-		}
+	// Copy LICENSE.md to root (uses embedded default if RC doesn't have one).
+	if err := CopyLicenseToRoot(inDir, outDir); err != nil {
+		return nil, fmt.Errorf("copying root LICENSE.md: %w", err)
 	}
 
 	// Copy each project directory to ingredients/
@@ -72,14 +69,12 @@ func (h *taHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		}
 	}
 
-	// Copy LICENSE.md to ingredients/LICENSE.md
-	if _, err := os.Stat(licSrc); err == nil {
-		ing, err := CopyFileAndComputeIngredient(licSrc, outDir, "ingredients/LICENSE.md")
-		if err != nil {
-			return nil, fmt.Errorf("copying ingredients/LICENSE.md: %w", err)
-		}
-		m.Ingredients["ingredients/LICENSE.md"] = ing
+	// Copy LICENSE.md to ingredients/LICENSE.md (uses embedded default if RC doesn't have one).
+	licIng, err := CopyLicenseIngredient(inDir, outDir)
+	if err != nil {
+		return nil, fmt.Errorf("copying ingredients/LICENSE.md: %w", err)
 	}
+	m.Ingredients["ingredients/LICENSE.md"] = licIng
 
 	return m, nil
 }

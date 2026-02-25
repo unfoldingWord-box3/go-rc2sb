@@ -34,6 +34,7 @@ func Convert(ctx context.Context, inDir string, outDir string, opts Options) (Re
 
 - Reads `manifest.yaml` from `inDir`, determines the subject, looks up the handler, runs conversion, writes `metadata.json` to `outDir`.
 - `Options.PayloadPath` specifies an explicit path to a `<lang>_tw` directory for TWL payload creation. If empty, auto-detects `<lang>_tw/` inside `inDir`.
+- `Options.USFMPath` specifies a directory containing USFM files for localized Bible book names (used by TSV handlers). Bible handlers read USFM directly from their own input files.
 
 ### Package Structure
 
@@ -49,7 +50,7 @@ go-rc2sb/
 │   ├── metadata.go         # SB metadata.json types and JSON serialization
 │   └── ingredient.go       # Ingredient computation (MD5, MIME type, size)
 ├── books/
-│   └── books.go            # Bible book data (66 books, localized names, codes)
+│   └── books.go            # Bible book data (66 books, localized names, codes, USFM parsing)
 ├── handler/
 │   ├── handler.go          # Handler interface definition
 │   ├── registry.go         # Subject -> handler registry (Register/Lookup)
@@ -109,6 +110,7 @@ go-rc2sb/
 4. **Content preservation**: File contents (Markdown, USFM, TSV) are unchanged between formats (except TWL TSV link rewriting)
 5. **Root file copying**: README.md, .gitignore, .gitea/, .github/ are copied from RC to SB root if present (not .git/)
 6. **TWL payload resolution**: If `Options.PayloadPath` is set or a `<lang>_tw/` subdirectory exists in the RC repo (where `<lang>` = `dublin_core.language.identifier`), copies the TW `bible/*` to `ingredients/payload/` and rewrites `rc://*/tw/dict/bible/{path}` links in TSV files to `./payload/{path}.md`
+7. **Localized book names**: Bible book names in `localizedNames` are resolved by priority: (1) USFM `\toc1`/`\toc2`/`\toc3` markers from the USFM file itself (Bible handlers) or from `Options.USFMPath` (TSV handlers), (2) manifest `projects[].title`, (3) English fallback from `books/books.go`. The `books.ParseUSFMBookNames()` function reads the first 20 lines of a USFM file to extract these markers, falling back to `\mt`/`\h` when toc markers are absent.
 
 ### Testing
 

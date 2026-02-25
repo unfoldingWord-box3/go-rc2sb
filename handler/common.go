@@ -1,6 +1,7 @@
 package handler
 
 import (
+	_ "embed"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +12,12 @@ import (
 	"github.com/nichmahn/go-rc2sb/rc"
 	"github.com/nichmahn/go-rc2sb/sb"
 )
+
+// defaultLicense is the embedded CC BY-SA 4.0 LICENSE.md used as a fallback
+// when the RC repository does not include its own LICENSE.md file.
+//
+//go:embed default_license.md
+var defaultLicense []byte
 
 // CopyFile copies a file from src to dst, creating any necessary directories.
 func CopyFile(src, dst string) error {
@@ -141,10 +148,41 @@ func BuildCopyright(manifest *rc.Manifest, isOBS bool) sb.Copyright {
 	}
 }
 
-// CopyLicenseIngredient copies LICENSE.md from RC to ingredients/LICENSE.md and returns the ingredient.
+// CopyLicenseIngredient copies LICENSE.md from the RC repo to ingredients/LICENSE.md
+// and returns the ingredient. If the RC repo does not contain a LICENSE.md file,
+// the embedded default CC BY-SA 4.0 license is used instead.
 func CopyLicenseIngredient(inDir, outDir string) (sb.Ingredient, error) {
 	src := filepath.Join(inDir, "LICENSE.md")
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		// Use the embedded default LICENSE.md
+		return writeDefaultLicenseIngredient(outDir)
+	}
 	return CopyFileAndComputeIngredient(src, outDir, "ingredients/LICENSE.md")
+}
+
+// writeDefaultLicenseIngredient writes the embedded default LICENSE.md
+// to ingredients/LICENSE.md and computes its ingredient entry.
+func writeDefaultLicenseIngredient(outDir string) (sb.Ingredient, error) {
+	dst := filepath.Join(outDir, "ingredients", "LICENSE.md")
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return sb.Ingredient{}, fmt.Errorf("creating directory for %s: %w", dst, err)
+	}
+	if err := os.WriteFile(dst, defaultLicense, 0644); err != nil {
+		return sb.Ingredient{}, fmt.Errorf("writing default LICENSE.md: %w", err)
+	}
+	return sb.ComputeIngredient(dst)
+}
+
+// CopyLicenseToRoot copies LICENSE.md from the RC repo to the SB output root directory.
+// If the RC repo does not contain a LICENSE.md file, the embedded default is used instead.
+func CopyLicenseToRoot(inDir, outDir string) error {
+	src := filepath.Join(inDir, "LICENSE.md")
+	dst := filepath.Join(outDir, "LICENSE.md")
+	if _, err := os.Stat(src); os.IsNotExist(err) {
+		// Use the embedded default LICENSE.md
+		return os.WriteFile(dst, defaultLicense, 0644)
+	}
+	return CopyFile(src, dst)
 }
 
 // CopyRootFile copies a root-level file from RC to SB root and returns the ingredient.

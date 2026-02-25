@@ -42,6 +42,8 @@ func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 
 	m.Copyright = BuildCopyright(manifest, false)
 
+	lang := manifest.DublinCore.Language.Identifier
+
 	// Process each project (TSV file per book)
 	for _, project := range manifest.Projects {
 		if err := ctx.Err(); err != nil {
@@ -62,8 +64,14 @@ func (h *tqHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, o
 		scope := map[string][]string{bookCode: {}}
 		currentScope[bookCode] = []string{}
 
-		// Add localized name
-		key, localizedName := books.LocalizedNameEntry(bookID)
+		// Add localized name: try USFM from USFMPath, then manifest title, then English
+		var usfmNames *books.LocalizedBookNames
+		if opts.USFMPath != "" {
+			if usfmFile := books.FindUSFMFile(opts.USFMPath, bookID); usfmFile != "" {
+				usfmNames = books.ParseUSFMBookNames(usfmFile)
+			}
+		}
+		key, localizedName := books.LocalizedNameEntryWithNames(bookID, lang, project.Title, usfmNames)
 		if key != "" {
 			m.LocalizedNames[key] = localizedName
 		}

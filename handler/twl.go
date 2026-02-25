@@ -52,12 +52,13 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 
 	m.Copyright = BuildCopyright(manifest, false)
 
+	lang := manifest.DublinCore.Language.Identifier
+
 	// Determine payload source: explicit PayloadPath option, or auto-detect <lang>_tw/ in inDir
 	var twBibleDir string
 	if opts.PayloadPath != "" {
 		twBibleDir = filepath.Join(opts.PayloadPath, "bible")
 	} else {
-		lang := manifest.DublinCore.Language.Identifier
 		twBibleDir = filepath.Join(inDir, lang+"_tw", "bible")
 	}
 
@@ -91,8 +92,14 @@ func (h *twlHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir, 
 		scope := map[string][]string{bookCode: {}}
 		currentScope[bookCode] = []string{}
 
-		// Add localized name
-		key, localizedName := books.LocalizedNameEntry(bookID)
+		// Add localized name: try USFM from USFMPath, then manifest title, then English
+		var usfmNames *books.LocalizedBookNames
+		if opts.USFMPath != "" {
+			if usfmFile := books.FindUSFMFile(opts.USFMPath, bookID); usfmFile != "" {
+				usfmNames = books.ParseUSFMBookNames(usfmFile)
+			}
+		}
+		key, localizedName := books.LocalizedNameEntryWithNames(bookID, lang, project.Title, usfmNames)
 		if key != "" {
 			m.LocalizedNames[key] = localizedName
 		}

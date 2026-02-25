@@ -2,10 +2,21 @@
 package books
 
 import (
+	"bufio"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/nichmahn/go-rc2sb/sb"
 )
+
+// LocalizedBookNames holds localized book name data extracted from USFM markers.
+type LocalizedBookNames struct {
+	Long  string // from \toc1 (or fallback: \mt1, \mt)
+	Short string // from \toc2 (or fallback: \h)
+	Abbr  string // from \toc3
+}
 
 // BookInfo holds information about a single Bible book.
 type BookInfo struct {
@@ -141,4 +152,178 @@ func CodeFromProjectID(id string) string {
 	}
 	// Fallback: uppercase the id
 	return strings.ToUpper(id)
+}
+
+// LocalizedNameEntryWithNames builds a LocalizedName using the following priority:
+//  1. USFM toc markers (if usfmNames is non-nil and fields are non-empty)
+//  2. Manifest project title (if non-empty)
+//  3. English fallback from AllBooks
+//
+// The lang parameter specifies the language tag for the localized names (e.g., "hi", "en").
+// English fallback names are always included under the "en" key.
+func LocalizedNameEntryWithNames(id string, lang string, projectTitle string, usfmNames *LocalizedBookNames) (string, sb.LocalizedName) {
+	b := ByID(id)
+	if b == nil {
+		return "", sb.LocalizedName{}
+	}
+	key := "book-" + b.ID
+
+	ln := sb.LocalizedName{
+		Abbr:  make(map[string]string),
+		Short: make(map[string]string),
+		Long:  make(map[string]string),
+	}
+
+	// Always include English fallback names
+	ln.Abbr["en"] = b.Abbr
+	ln.Short["en"] = b.Short
+	ln.Long["en"] = b.Long
+
+	// If the language is English, we only need to apply overrides from USFM/manifest
+	// on top of the English defaults. If non-English, add localized entries under the lang key.
+	if lang == "en" {
+		// For English, USFM toc values override the hardcoded English defaults
+		if usfmNames != nil {
+			if usfmNames.Long != "" {
+				ln.Long["en"] = usfmNames.Long
+			}
+			if usfmNames.Short != "" {
+				ln.Short["en"] = usfmNames.Short
+			}
+			if usfmNames.Abbr != "" {
+				ln.Abbr["en"] = usfmNames.Abbr
+			}
+		}
+		return key, ln
+	}
+
+	// For non-English languages, build localized entries under the lang key.
+	// Priority: USFM toc markers > project title > (omit localized key)
+
+	// Long name: \toc1 > projectTitle > (English only)
+	localLong := ""
+	if usfmNames != nil && usfmNames.Long != "" {
+		localLong = usfmNames.Long
+	} else if projectTitle != "" {
+		localLong = projectTitle
+	}
+	if localLong != "" {
+		ln.Long[lang] = localLong
+	}
+
+	// Short name: \toc2 > projectTitle > (English only)
+	localShort := ""
+	if usfmNames != nil && usfmNames.Short != "" {
+		localShort = usfmNames.Short
+	} else if projectTitle != "" {
+		localShort = projectTitle
+	}
+	if localShort != "" {
+		ln.Short[lang] = localShort
+	}
+
+	// Abbreviation: \toc3 > (English only)
+	if usfmNames != nil && usfmNames.Abbr != "" {
+		ln.Abbr[lang] = usfmNames.Abbr
+	}
+
+	return key, ln
+}
+
+// ParseUSFMBookNames reads the first 20 lines of a USFM file and extracts
+// \toc1, \toc2, \toc3 markers for localized book names. Falls back to \mt1/\mt
+// for the long name and \h for the short name if toc markers are missing.
+// Returns nil if the file doesn't exist or contains no useful markers.
+func ParseUSFMBookNames(filePath string) *LocalizedBookNames {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil
+	}
+	defer f.Close()
+
+	var toc1, toc2, toc3, h, mt string
+
+	scanner := bufio.NewScanner(f)
+	lineCount := 0
+	for scanner.Scan() && lineCount < 20 {
+		lineCount++
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		if val := extractUSFMMarker(line, `\toc1`); val != "" {
+			toc1 = val
+		} else if val := extractUSFMMarker(line, `\toc2`); val != "" {
+			toc2 = val
+		} else if val := extractUSFMMarker(line, `\toc3`); val != "" {
+			toc3 = val
+		} else if val := extractUSFMMarker(line, `\h`); val != "" {
+			h = val
+		} else if val := extractUSFMMarker(line, `\mt1`); val != "" {
+			mt = val
+		} else if val := extractUSFMMarker(line, `\mt`); val != "" && mt == "" {
+			// \mt without number, only use if \mt1 wasn't found
+			mt = val
+		}
+	}
+
+	// Build result with fallbacks
+	longName := toc1
+	if longName == "" {
+		longName = mt
+	}
+	shortName := toc2
+	if shortName == "" {
+		shortName = h
+	}
+
+	// Return nil if nothing useful was found
+	if longName == "" && shortName == "" && toc3 == "" {
+		return nil
+	}
+
+	return &LocalizedBookNames{
+		Long:  longName,
+		Short: shortName,
+		Abbr:  toc3,
+	}
+}
+
+// FindUSFMFile searches for a USFM file matching a book code in a directory.
+// It looks for patterns like "NN-CODE.usfm" (e.g., "01-GEN.usfm") or "CODE.usfm".
+// Returns the full path if found, or empty string if not found.
+func FindUSFMFile(usfmDir string, bookID string) string {
+	code := CodeFromProjectID(bookID)
+
+	// Try NN-CODE.usfm pattern first (most common)
+	matches, err := filepath.Glob(filepath.Join(usfmDir, fmt.Sprintf("*-%s.usfm", code)))
+	if err == nil && len(matches) > 0 {
+		return matches[0]
+	}
+
+	// Try CODE.usfm
+	direct := filepath.Join(usfmDir, code+".usfm")
+	if _, err := os.Stat(direct); err == nil {
+		return direct
+	}
+
+	// Try lowercase variants
+	matches, err = filepath.Glob(filepath.Join(usfmDir, fmt.Sprintf("*-%s.usfm", strings.ToLower(code))))
+	if err == nil && len(matches) > 0 {
+		return matches[0]
+	}
+
+	return ""
+}
+
+// extractUSFMMarker extracts the value after a USFM marker like "\toc1 VALUE".
+// Returns empty string if the line doesn't start with the marker.
+func extractUSFMMarker(line, marker string) string {
+	// The marker must be at the start of the line and followed by a space
+	if !strings.HasPrefix(line, marker+" ") && line != marker {
+		return ""
+	}
+	val := strings.TrimPrefix(line, marker)
+	return strings.TrimSpace(val)
 }

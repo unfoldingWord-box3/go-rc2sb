@@ -60,12 +60,36 @@ result, err := rc2sb.Convert(ctx, "/path/to/en_twl", "/path/to/output", rc2sb.Op
 
 If neither `PayloadPath` is set nor a `<lang>_tw/` subdirectory exists, the TSV files are copied as-is without payload or link rewriting.
 
+### Localized Book Names
+
+Bible book names in the SB `localizedNames` are resolved using this priority:
+
+1. **USFM `\toc1`/`\toc2`/`\toc3` markers** — For Bible/USFM repos, these are read directly from the USFM files in the input. For TSV repos, use `USFMPath` to point to a USFM directory.
+2. **Manifest `projects[].title`** — The `title` field from the RC `manifest.yaml` project entries.
+3. **English fallback** — Hardcoded English names from `books/books.go`.
+
+For non-English repos, this ensures book names like "उत्पत्ति" (Hindi for Genesis) appear in the metadata instead of only English names.
+
+```go
+// Convert a Hindi TN repo with book names from a Hindi Bible USFM repo
+opts := rc2sb.Options{
+    USFMPath: "/path/to/hi_irv",  // directory containing NN-CODE.usfm files
+}
+result, err := rc2sb.Convert(ctx, "/path/to/hi_tn", "/path/to/output", opts)
+```
+
 ### CLI Tool
 
 A simple CLI wrapper is available at `cmd/rc2sb/`:
 
 ```bash
 go run ./cmd/rc2sb /path/to/rc-repo /path/to/sb-output
+
+# With localized book names from a USFM directory (for TSV repos)
+go run ./cmd/rc2sb --usfm /path/to/hi_irv /path/to/hi_tn /path/to/sb-output
+
+# With TWL payload
+go run ./cmd/rc2sb --payload /path/to/en_tw /path/to/en_twl /path/to/sb-output
 ```
 
 ## API
@@ -89,6 +113,12 @@ type Options struct {
     // Used for TWL conversion to create the ingredients/payload/ directory and
     // rewrite rc:// links in TSV files. If empty, auto-detects <lang>_tw/ inside inDir.
     PayloadPath string
+
+    // USFMPath is the path to a directory containing USFM files for localized
+    // Bible book names. Used by TSV handlers (TN, TQ, TWL) to extract
+    // \toc1, \toc2, \toc3 markers. If empty, uses manifest project titles,
+    // then English fallback.
+    USFMPath string
 }
 ```
 

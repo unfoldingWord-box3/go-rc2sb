@@ -52,6 +52,8 @@ func (h *bibleHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir
 
 	m.Copyright = BuildCopyright(manifest, false)
 
+	lang := manifest.DublinCore.Language.Identifier
+
 	// Process each project
 	for _, project := range manifest.Projects {
 		if err := ctx.Err(); err != nil {
@@ -76,8 +78,11 @@ func (h *bibleHandler) Convert(ctx context.Context, manifest *rc.Manifest, inDir
 			scope = map[string][]string{code: {}}
 			currentScope[code] = []string{}
 
-			// Add localized name
-			key, localizedName := books.LocalizedNameEntry(bookID)
+			// Parse USFM file for localized book names (\toc1, \toc2, \toc3)
+			usfmNames := books.ParseUSFMBookNames(srcPath)
+
+			// Add localized name using: USFM > manifest project title > English fallback
+			key, localizedName := books.LocalizedNameEntryWithNames(bookID, lang, project.Title, usfmNames)
 			if key != "" {
 				m.LocalizedNames[key] = localizedName
 			}
