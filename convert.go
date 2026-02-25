@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/nichmahn/go-rc2sb/handler"
-	"github.com/nichmahn/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/handler"
+	"github.com/unfoldingWord/go-rc2sb/rc"
 
 	// Import all handlers to register them.
-	_ "github.com/nichmahn/go-rc2sb/handler/subjects"
+	_ "github.com/unfoldingWord/go-rc2sb/handler/subjects"
 )
 
 // Convert converts an RC repository at inDir to SB format, writing output to outDir.

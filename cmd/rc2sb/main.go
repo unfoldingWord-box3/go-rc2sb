@@ -21,7 +21,7 @@ import (
 	"log"
 	"os"
 
-	rc2sb "github.com/nichmahn/go-rc2sb"
+	rc2sb "github.com/unfoldingWord/go-rc2sb"
 )
 
 func main() {

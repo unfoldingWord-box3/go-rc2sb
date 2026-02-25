@@ -5,7 +5,7 @@ Go library for converting [Resource Container](https://resource-container.readth
 ## Installation
 
 ```bash
-go get github.com/nichmahn/go-rc2sb
+go get github.com/unfoldingWord/go-rc2sb
 ```
 
 ## Usage
@@ -18,7 +18,7 @@ import (
     "fmt"
     "log"
 
-    rc2sb "github.com/nichmahn/go-rc2sb"
+    rc2sb "github.com/unfoldingWord/go-rc2sb"
 )
 
 func main() {

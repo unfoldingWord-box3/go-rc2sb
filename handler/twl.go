@@ -9,9 +9,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/nichmahn/go-rc2sb/books"
-	"github.com/nichmahn/go-rc2sb/rc"
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/books"
+	"github.com/unfoldingWord/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // twLinkRegexp parses RC links like "rc://*/tw/dict/bible/other/creation"

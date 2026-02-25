@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	rc2sb "github.com/nichmahn/go-rc2sb"
+	rc2sb "github.com/unfoldingWord/go-rc2sb"
 )
 
 func TestConvert_MissingManifest(t *testing.T) {

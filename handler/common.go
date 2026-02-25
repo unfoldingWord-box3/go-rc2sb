@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nichmahn/go-rc2sb/rc"
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // defaultLicense is the embedded CC BY-SA 4.0 LICENSE.md used as a fallback

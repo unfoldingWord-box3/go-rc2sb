@@ -3,7 +3,7 @@
 package subjects
 
 import (
-	"github.com/nichmahn/go-rc2sb/handler"
+	"github.com/unfoldingWord/go-rc2sb/handler"
 )
 
 func init() {

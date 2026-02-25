@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nichmahn/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/rc"
 )
 
 func TestLoadManifest_MissingFile(t *testing.T) {

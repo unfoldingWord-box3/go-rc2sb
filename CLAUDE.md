@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Go library (`github.com/nichmahn/go-rc2sb`) for converting Resource Container (RC) repositories to Scripture Burrito (SB) repositories. RC is a format used by unfoldingWord for Bible translation resources (spec: rc0.2). SB (Scripture Burrito) is the newer standardized format (spec: 1.0.0).
+Go library (`github.com/unfoldingWord/go-rc2sb`) for converting Resource Container (RC) repositories to Scripture Burrito (SB) repositories. RC is a format used by unfoldingWord for Bible translation resources (spec: rc0.2). SB (Scripture Burrito) is the newer standardized format (spec: 1.0.0).
 
 ## Build & Test Commands
 
@@ -70,7 +70,7 @@ go-rc2sb/
 ### Key Design Patterns
 
 - **Handler pattern**: Each subject type implements the `Handler` interface (`Subject() string`, `Convert(...)`). Handlers are registered in `handler/subjects/register.go` via `init()`.
-- **Blank import for registration**: `convert.go` imports `_ "github.com/nichmahn/go-rc2sb/handler/subjects"` to trigger handler registration.
+- **Blank import for registration**: `convert.go` imports `_ "github.com/unfoldingWord/go-rc2sb/handler/subjects"` to trigger handler registration.
 - **Shared helpers in `handler/common.go`**: `BuildBaseMetadata()`, `BuildCopyright()`, `CopyFileAndComputeIngredient()`, `CopyFileWithScope()`, `CopyLicenseIngredient()`, `CopyCommonRootFiles()`.
 - **Root file copying**: All handlers call `CopyCommonRootFiles()` which copies README.md, .gitignore, .gitea/, .github/ (but NOT .git/) from the RC repo if they exist.
 

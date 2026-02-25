@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nichmahn/go-rc2sb/rc"
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // obsTSVConfig holds the configuration for a specific OBS TSV variant.

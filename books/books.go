@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // LocalizedBookNames holds localized book name data extracted from USFM markers.

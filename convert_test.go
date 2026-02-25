@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	rc2sb "github.com/nichmahn/go-rc2sb"
-	"github.com/nichmahn/go-rc2sb/sb"
+	rc2sb "github.com/unfoldingWord/go-rc2sb"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // samplesDir returns the path to the samples directory, if it exists.

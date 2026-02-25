@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/nichmahn/go-rc2sb/handler"
-	"github.com/nichmahn/go-rc2sb/rc"
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/handler"
+	"github.com/unfoldingWord/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 
 	// Register all handlers so Lookup works.
-	_ "github.com/nichmahn/go-rc2sb/handler/subjects"
+	_ "github.com/unfoldingWord/go-rc2sb/handler/subjects"
 )
 
 // --- CopyCommonRootFiles tests ---

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/nichmahn/go-rc2sb/books"
+	"github.com/unfoldingWord/go-rc2sb/books"
 )
 
 func TestByID(t *testing.T) {

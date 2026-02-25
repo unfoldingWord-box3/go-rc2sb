@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/nichmahn/go-rc2sb/rc"
-	"github.com/nichmahn/go-rc2sb/sb"
+	"github.com/unfoldingWord/go-rc2sb/rc"
+	"github.com/unfoldingWord/go-rc2sb/sb"
 )
 
 // NewTWHandler creates a new Translation Words handler.

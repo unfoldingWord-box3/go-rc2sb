@@ -1,4 +1,4 @@
-module github.com/nichmahn/go-rc2sb
+module github.com/unfoldingWord/go-rc2sb
 
 go 1.25.0
 
